@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+wedding.db
+*.sqlite
+*.db
+
+.env
+.env.*
+
+*.log
