@@ -115,7 +115,7 @@ function PublicSearchPage({ slug }: { slug: string }) {
 }
 
 function AdminPage() {
-  const [eventName, setEventName] = useState("Rahul Wedding");
+  const [eventName, setEventName] = useState("");
   const [event, setEvent] = useState<EventResponse | null>(null);
   const [step, setStep] = useState<AdminStep>("create");
   const [files, setFiles] = useState<File[]>([]);
@@ -180,7 +180,7 @@ function AdminPage() {
     <main className="app-shell">
       <section className="topbar">
         <div>
-          <p className="eyebrow">Face event search</p>
+          <p className="eyebrow"></p>
           <h1>
             {step === "create" && "Create Event"}
             {step === "upload" && (event?.name ?? "Upload Album")}
