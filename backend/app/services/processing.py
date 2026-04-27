@@ -17,6 +17,8 @@ def process_event(repo: Repository, event_id: str) -> dict[str, int]:
     indexed_photos = 0
     created_photo_faces = 0
     for photo in repo.list_event_photos(event_id):
+        if photo.status != "uploaded":
+            continue
         indexed_faces = index_photo_faces(
             collection_id=event.collection_id,
             s3_key=photo.s3_key,
@@ -37,7 +39,6 @@ def process_event(repo: Repository, event_id: str) -> dict[str, int]:
             )
             if photo_face is not None:
                 created_photo_faces += 1
-        repo.mark_photo_indexed(photo.id)
         indexed_photos += 1
 
     repo.update_event_status(event_id, "ready")
