@@ -74,6 +74,49 @@ type SearchResponse = {
   }>;
 };
 
+const formatErrorMessage = (error: unknown): string => {
+  if (typeof error === "string") {
+    return error;
+  }
+
+  if (error && typeof error === "object") {
+    const detail = (error as { detail?: unknown }).detail;
+
+    if (typeof detail === "string") {
+      return detail;
+    }
+
+    if (Array.isArray(detail)) {
+      return detail
+        .map((item) => {
+          if (typeof item === "string") {
+            return item;
+          }
+          if (item && typeof item === "object") {
+            const message = (item as { msg?: unknown }).msg;
+            if (typeof message === "string") {
+              return message;
+            }
+          }
+          return JSON.stringify(item);
+        })
+        .join("; ");
+    }
+
+    if (detail && typeof detail === "object") {
+      return JSON.stringify(detail, null, 2);
+    }
+
+    if ("message" in error && typeof (error as { message?: unknown }).message === "string") {
+      return (error as { message: string }).message;
+    }
+
+    return JSON.stringify(error, null, 2);
+  }
+
+  return "Request failed";
+};
+
 const requestJson = async <T>(path: string, init?: RequestInit): Promise<T> => {
   const response = await fetch(`${API_BASE}${path}`, {
     ...init,
@@ -85,7 +128,7 @@ const requestJson = async <T>(path: string, init?: RequestInit): Promise<T> => {
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.detail ?? "Request failed");
+    throw new Error(formatErrorMessage(error));
   }
 
   return response.json();
@@ -150,7 +193,7 @@ export const uploadFilesToStorage = async (
 
         if (!completeResponse.ok) {
           const error = await completeResponse.json().catch(() => ({}));
-          throw new Error(error.detail ?? `Upload completion failed for ${upload.filename}`);
+          throw new Error(formatErrorMessage(error) || `Upload completion failed for ${upload.filename}`);
         }
 
         return;
@@ -197,7 +240,7 @@ export const uploadFilesToStorage = async (
 
       if (!completeResponse.ok) {
         const error = await completeResponse.json().catch(() => ({}));
-        throw new Error(error.detail ?? `Multipart completion failed for ${upload.filename}`);
+        throw new Error(formatErrorMessage(error) || `Multipart completion failed for ${upload.filename}`);
       }
     }),
   );
@@ -222,7 +265,7 @@ export const searchEvent = async (slug: string, selfie: File) => {
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.detail ?? "Search failed");
+    throw new Error(formatErrorMessage(error) || "Search failed");
   }
 
   return response.json() as Promise<SearchResponse>;
