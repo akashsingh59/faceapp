@@ -48,8 +48,37 @@ function PublicSearchPage({ slug }: { slug: string }) {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    getPublicEvent(slug).then(setEvent).catch((err) => setError(err.message));
-  }, [slug]);
+    let cancelled = false;
+
+    const refreshEvent = async () => {
+      try {
+        const nextEvent = await getPublicEvent(slug);
+        if (!cancelled) {
+          setEvent(nextEvent);
+          setError("");
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Could not load event status");
+        }
+      }
+    };
+
+    void refreshEvent();
+
+    if (event?.status === "ready") {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      void refreshEvent();
+    }, 2000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [slug, event?.status]);
 
   const runSearch = async () => {
     if (!selfie) return;

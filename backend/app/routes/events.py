@@ -19,7 +19,7 @@ from app.models import (
 )
 from app.repository import repo
 from app.services.events import create_event, event_to_detail, event_to_response
-from app.services.processing import process_event
+from app.services.processing import enqueue_event_processing
 from app.services.uploads import (
     UploadError,
     abort_photo_upload,
@@ -111,13 +111,13 @@ def process_event_route(event_id: str) -> ProcessEventResponse:
     if event is None:
         raise HTTPException(status_code=404, detail="Event not found")
 
-    result = process_event(repo, event_id)
+    result = enqueue_event_processing(repo, event_id)
     return ProcessEventResponse(
         event_id=event_id,
-        status="ready",
-        indexed_photos=result["indexed_photos"],
-        persons=result["persons"],
-        photo_faces=result["photo_faces"],
+        status=str(result["status"]),
+        indexed_photos=int(result["indexed_photos"]),
+        persons=int(result["persons"]),
+        photo_faces=int(result["photo_faces"]),
     )
 
 
