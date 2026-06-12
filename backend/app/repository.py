@@ -441,6 +441,65 @@ class PostgresRepository:
             max_overflow=20,
         )
 
+    def schema_is_compatible(self) -> bool:
+        required_photos = {
+            "id",
+            "event_id",
+            "s3_key",
+            "filename",
+            "status",
+            "size_bytes",
+            "upload_mode",
+            "upload_started_at",
+            "uploaded_at",
+            "upload_error_code",
+            "upload_error_message",
+        }
+        required_sessions = {
+            "id",
+            "photo_id",
+            "event_id",
+            "upload_mode",
+            "s3_multipart_upload_id",
+            "part_size_bytes",
+            "part_count",
+            "status",
+            "expires_at",
+            "created_at",
+            "updated_at",
+        }
+
+        try:
+            with self.engine.begin() as conn:
+                photos = {
+                    row[0]
+                    for row in conn.execute(
+                        text(
+                            """
+                            SELECT column_name
+                            FROM information_schema.columns
+                            WHERE table_schema = 'public' AND table_name = 'photos'
+                            """
+                        )
+                    ).all()
+                }
+                sessions = {
+                    row[0]
+                    for row in conn.execute(
+                        text(
+                            """
+                            SELECT column_name
+                            FROM information_schema.columns
+                            WHERE table_schema = 'public' AND table_name = 'photo_upload_sessions'
+                            """
+                        )
+                    ).all()
+                }
+        except Exception:
+            return False
+
+        return required_photos.issubset(photos) and required_sessions.issubset(sessions)
+
     def create_event(self, name: str, slug: str) -> EventRecord:
         event_id = new_id()
         row = self._one(
@@ -510,7 +569,6 @@ class PostgresRepository:
                 s3_key,
                 filename,
                 status,
-                content_type,
                 size_bytes,
                 upload_mode
             )
@@ -520,11 +578,10 @@ class PostgresRepository:
                 :s3_key,
                 :filename,
                 'pending_upload',
-                :content_type,
                 :size_bytes,
                 :upload_mode
             )
-            RETURNING id, event_id, s3_key, filename, status, content_type,
+            RETURNING id, event_id, s3_key, filename, status,
                 size_bytes, upload_mode, upload_started_at, uploaded_at,
                 upload_error_code, upload_error_message, created_at
             """,
@@ -543,7 +600,7 @@ class PostgresRepository:
     def get_photo(self, photo_id: str) -> PhotoRecord | None:
         row = self._maybe_one(
             """
-            SELECT id, event_id, s3_key, filename, status, content_type,
+            SELECT id, event_id, s3_key, filename, status,
                 size_bytes, upload_mode, upload_started_at, uploaded_at,
                 upload_error_code, upload_error_message, created_at
             FROM photos
@@ -556,7 +613,7 @@ class PostgresRepository:
     def get_photo_for_event(self, event_id: str, photo_id: str) -> PhotoRecord | None:
         row = self._maybe_one(
             """
-            SELECT id, event_id, s3_key, filename, status, content_type,
+            SELECT id, event_id, s3_key, filename, status,
                 size_bytes, upload_mode, upload_started_at, uploaded_at,
                 upload_error_code, upload_error_message, created_at
             FROM photos
@@ -569,7 +626,7 @@ class PostgresRepository:
     def list_event_photos(self, event_id: str) -> list[PhotoRecord]:
         rows = self._all(
             """
-            SELECT id, event_id, s3_key, filename, status, content_type,
+            SELECT id, event_id, s3_key, filename, status,
                 size_bytes, upload_mode, upload_started_at, uploaded_at,
                 upload_error_code, upload_error_message, created_at
             FROM photos
@@ -600,7 +657,7 @@ class PostgresRepository:
             """
         rows = self._all(
             f"""
-            SELECT id, event_id, s3_key, filename, status, content_type,
+            SELECT id, event_id, s3_key, filename, status,
                 size_bytes, upload_mode, upload_started_at, uploaded_at,
                 upload_error_code, upload_error_message, created_at
             FROM photos
@@ -691,7 +748,7 @@ class PostgresRepository:
                 status = 'uploading',
                 upload_started_at = COALESCE(upload_started_at, now())
             WHERE id = :id
-            RETURNING id, event_id, s3_key, filename, status, content_type,
+            RETURNING id, event_id, s3_key, filename, status,
                 size_bytes, upload_mode, upload_started_at, uploaded_at,
                 upload_error_code, upload_error_message, created_at
             """,
@@ -710,7 +767,7 @@ class PostgresRepository:
                 upload_error_code = NULL,
                 upload_error_message = NULL
             WHERE id = :id
-            RETURNING id, event_id, s3_key, filename, status, content_type,
+            RETURNING id, event_id, s3_key, filename, status,
                 size_bytes, upload_mode, upload_started_at, uploaded_at,
                 upload_error_code, upload_error_message, created_at
             """,
@@ -733,7 +790,7 @@ class PostgresRepository:
                 upload_error_code = :error_code,
                 upload_error_message = :error_message
             WHERE id = :id
-            RETURNING id, event_id, s3_key, filename, status, content_type,
+            RETURNING id, event_id, s3_key, filename, status,
                 size_bytes, upload_mode, upload_started_at, uploaded_at,
                 upload_error_code, upload_error_message, created_at
             """,
@@ -747,7 +804,7 @@ class PostgresRepository:
             UPDATE photos
             SET status = 'upload_aborted'
             WHERE id = :id
-            RETURNING id, event_id, s3_key, filename, status, content_type,
+            RETURNING id, event_id, s3_key, filename, status,
                 size_bytes, upload_mode, upload_started_at, uploaded_at,
                 upload_error_code, upload_error_message, created_at
             """,
@@ -933,7 +990,7 @@ def photo_from_row(row: RowMapping) -> PhotoRecord:
         s3_key=str(row["s3_key"]),
         filename=str(row["filename"]),
         status=str(row["status"]),
-        content_type=str(row["content_type"]) if row["content_type"] is not None else None,
+        content_type=(str(row["content_type"]) if "content_type" in row and row["content_type"] is not None else None),
         size_bytes=int(row["size_bytes"]),
         upload_mode=str(row["upload_mode"]),
         upload_started_at=row_time(row["upload_started_at"]) if row["upload_started_at"] is not None else None,
@@ -995,7 +1052,10 @@ def client_search_from_row(row: RowMapping) -> ClientSearchRecord:
 def build_repository() -> Repository:
     url = database_url()
     if url:
-        return PostgresRepository(url)
+        postgres_repo = PostgresRepository(url)
+        if postgres_repo.schema_is_compatible():
+            return postgres_repo
+        return MemoryRepository()
     return MemoryRepository()
 
 

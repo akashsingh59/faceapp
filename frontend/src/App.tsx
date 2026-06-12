@@ -6,7 +6,6 @@ import {
   getEvent,
   getPublicEvent,
   processEvent,
-  registerPhotos,
   searchEvent,
   uploadFilesToStorage,
   type EventDetailResponse,
@@ -157,9 +156,6 @@ function AdminPage() {
       const uploadUrls = await createUploadUrls(event.id, files);
       setProgress("Uploading photos to S3");
       await uploadFilesToStorage(event.id, files, uploadUrls.uploads);
-      setProgress("Registering photos");
-      const registered = await registerPhotos(event.id, uploadUrls.uploads);
-      setPhotos(registered.photos);
       setProgress("Indexing faces");
       const result = await processEvent(event.id);
       setProcessed(result);
