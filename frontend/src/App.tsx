@@ -207,7 +207,7 @@ function AdminPage() {
         <div>
           <p className="eyebrow"></p>
           <h1>
-            {step === "create" && "Create Event"}
+            {step === "create" && "FaceApp"}
             {step === "upload" && (event?.name ?? "Upload Album")}
             {step === "ready" && "Share Event"}
           </h1>
