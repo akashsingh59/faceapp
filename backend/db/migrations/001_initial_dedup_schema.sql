@@ -9,7 +9,7 @@ CREATE TABLE events (
     created_at timestamptz NOT NULL DEFAULT now(),
 
     CONSTRAINT events_status_check
-        CHECK (status IN ('created', 'processing', 'ready', 'failed')),
+        CHECK (status IN ('created', 'queued', 'processing', 'ready', 'failed', 'processing_failed')),
     CONSTRAINT events_slug_check
         CHECK (slug ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$')
 );

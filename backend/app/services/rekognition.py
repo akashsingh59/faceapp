@@ -1,9 +1,12 @@
 import os
 from dataclasses import dataclass
 from pathlib import Path
+import logging
 
 from app.repository import PersonRecord, Repository
-from app.services.s3 import s3_bucket
+from app.services.s3 import aws_region, s3_bucket
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -33,7 +36,7 @@ def face_id_from_selfie(filename: str) -> str:
 def rekognition_client():
     import boto3
 
-    return boto3.client("rekognition")
+    return boto3.client("rekognition", region_name=aws_region())
 
 
 def ensure_collection(collection_id: str) -> None:
@@ -54,12 +57,25 @@ def index_photo_faces(collection_id: str, s3_key: str, filename: str) -> list[In
     if not using_real_rekognition():
         return [IndexedFace(face_id=face_id_from_photo_filename(filename), similarity=99.0)]
 
-    response = rekognition_client().index_faces(
-        CollectionId=collection_id,
-        Image={"S3Object": {"Bucket": s3_bucket(), "Name": s3_key}},
-        MaxFaces=50,
-        QualityFilter="AUTO",
-    )
+    bucket = s3_bucket()
+    try:
+        response = rekognition_client().index_faces(
+            CollectionId=collection_id,
+            Image={"S3Object": {"Bucket": bucket, "Name": s3_key}},
+            MaxFaces=50,
+            QualityFilter="AUTO",
+        )
+    except Exception:
+        logger.exception(
+            "rekognition_index_faces_failed",
+            extra={
+                "collection_id": collection_id,
+                "bucket": bucket,
+                "s3_key": s3_key,
+                "filename": filename,
+            },
+        )
+        raise
 
     faces: list[IndexedFace] = []
     for record in response.get("FaceRecords", []):

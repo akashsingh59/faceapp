@@ -1,4 +1,10 @@
-const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
+const envApiBase = import.meta.env.VITE_API_URL?.trim();
+const localhostLike = /^(https?:\/\/)?(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?$/i;
+
+const API_BASE =
+  envApiBase && !localhostLike.test(envApiBase)
+    ? envApiBase.replace(/\/$/, "")
+    : `${window.location.protocol}//${window.location.hostname}:8000`;
 
 type EventResponse = {
   id: string;

@@ -78,6 +78,15 @@ def process_event(repo: Repository, event_id: str, retries: int = 3) -> dict[str
                 if photo.status != "uploaded":
                     continue
 
+                logger.info(
+                    "indexing_photo_faces",
+                    extra={
+                        "event_id": event_id,
+                        "photo_id": photo.id,
+                        "filename": photo.filename,
+                        "s3_key": photo.s3_key,
+                    },
+                )
                 indexed_faces = index_photo_faces(
                     collection_id=event.collection_id,
                     s3_key=photo.s3_key,
